@@ -1,0 +1,72 @@
+1.找到公司的MP4视频中，用了哪些box.
+2.再分析这些box的作用。
+3.看代码里面的数据结构有助于理解这些box的结构和作用。
+
+
+dref的中，url是box，flag为1时，字符串（数据为空）
+
+moov
+	mvhd
+这一列的命名都是以st开头 
+stbl (bl: Sample Table)
+	stsd (sd:sample desciption)
+	stts (ts:timple to sample) （准确说法应该是decoding time to sample）
+	stss (ss:sync sample) 关键帧的位置（配合es eye很好看到）
+	stsz (sz:sample size)
+	stsc (sc:sample to chunk)
+
+
+stsd:
+官方文档能找到数据结构，class VisualSampleEntry
+内容对着代码writeVideoFourCCBox()即可
+                                            0000
+32658d0: 0089 6176 6331 0000 0000 0000 0001 0000  ..avc1..........				00000000 0000 0001 0000
+32658e0: 0000 0000 0000 0000 0000 0000 0000 0780  ................	0000 		   	
+32658f0: 0440 0048 0000 0048 0000 0000 0000 0001  .@.H...H........
+3265900: 0020 2020 2020 2020 2020 2020 2020 2020  .               
+3265910: 2020 2020 2020 2020 2020 2020 2020 2020                  
+3265920: 0018 ffff 0000 0023 6176 6343 0164 0029  .......#avcC.d.)
+3265930: ffe1 000c 6764 0029 ac1b 1a80 7802 2640  ....gd.)....x.&@
+3265940: 0100 0468 ea43 cb00 0000 1070 6173 7000  ...h.C.....pasp.
+3265950: 0100 0000 0100 0000 0014 5873 7474 7300  ......
+
+stts:
+官方文档中，8.6.1.2.2 Syntax. For example with table2,(Table 2 — Closed GOP Example，就14个选项，每个选项的Decode delta是10)
+本章都应该仔细看，只截取部分：
+The decoding time is defined in the Decoding Time to Sample Box, giving time
+deltas between successive decoding times.
+This rule derives from the rule that no two time-stamps in a stream may be the same.
+The value of DT for a sample is
+always the sum of the deltas of the preceding samples. Note that the total of the decoding deltas is the
+duration of the media in this track.
+
+size = int(32) entry_count + entry_count * (int(32) sample_count +int(32) sample_delta)
+实际计算：289H=649Dec, 649*8=5192,5192+16=5208dec=1458H,和box size值相同。
+
+
+stss:
+用es eyes分析前几个关键帧的序号和最后一帧(es从0开始计数，stss从1开始计数)
+
+stsz:
+Sample size:2e3=739dec, es eyes是738帧。
+
+stsc:
+数据部分，文件的位置:32679a3
+count:c,但是实际内容是d.
+first chunk       samples per chunk     sample description ID
+00 0000 01        00 0000 3f            00 0000 01
+00 0000 02        00 0000 38            00 0000 01
+00 0000 03        00 0000 36            00 0000 01
+00 0000 04        00 0000 39            00 0000 01
+00 0000 05        00 0000 3b            00 0000 01
+00 0000 07        00 0000 39            00 0000 01
+00 0000 08        00 0000 36            00 0000 01
+00 0000 09        00 0000 38            00 0000 01
+00 0000 0a        00 0000 3d            00 0000 01
+00 0000 0b        00 0000 35            00 0000 01
+00 0000 0c        00 0000 3d            00 0000 01
+00 0000 0d        00 0000 31            00 0000 01
+
+stco, co64:
+Chunk offset box:
+count:d,
